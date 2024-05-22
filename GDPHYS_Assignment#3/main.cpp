@@ -30,8 +30,6 @@ float scale = 0.5f;
 
 int main(void)
 {
-    
-
     std::fstream vertSrc("Shaders/sample.vert");
     std::stringstream vertBuff;
     vertBuff << vertSrc.rdbuf();
@@ -207,7 +205,6 @@ int main(void)
                 auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
                 std::cout << "Time elapsed: " << static_cast<float>(elapsed.count() / 1000.f) << " seconds" << std::endl;
                 timer_stopped = true;
-                break;
             }
         }
 
