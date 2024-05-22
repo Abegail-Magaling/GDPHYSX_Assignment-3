@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <chrono>
+#include <limits>  // For std::numeric_limits
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
@@ -12,7 +13,7 @@
 using namespace std::chrono_literals;
 constexpr std::chrono::nanoseconds timestep(16ms);
 
-//Modifier for the model's x Position
+// Modifier for the model's x Position
 float theta = 0.0f;
 
 // Set rotation axis to x-axis initially
@@ -29,10 +30,7 @@ float scale = 0.5f;
 
 int main(void)
 {
-    using clock = std::chrono::high_resolution_clock;
-    auto curr_time = clock::now();
-    auto prev_time = curr_time;
-    std::chrono::nanoseconds curr_ns(0);
+    
 
     std::fstream vertSrc("Shaders/sample.vert");
     std::stringstream vertBuff;
@@ -50,24 +48,40 @@ int main(void)
     float window_width = 800;
     float window_height = 800;
 
-
+    // Take user input for velocity
     float X_Vel, Y_Vel, Z_Vel;
+    bool allDefined = false;
 
     std::cout << "Enter Velocity: " << std::endl;
+
     std::cout << "X: ";
     std::cin >> X_Vel;
+    if (!std::cin.fail()) {
+        std::cout << "Y: ";
+        std::cin >> Y_Vel;
+        if (!std::cin.fail()) {
+            std::cout << "Z: ";
+            std::cin >> Z_Vel;
+            if (!std::cin.fail()) {
+                allDefined = true;
+            }
+        }
+    }
 
-    std::cout << "Y: ";
-    std::cin >> Y_Vel;
+    using clock = std::chrono::high_resolution_clock;
+    auto curr_time = clock::now();
+    auto prev_time = curr_time;
+    std::chrono::nanoseconds curr_ns(0);
 
-    std::cout << "Z: ";
-    std::cin >> Z_Vel;
-
+    // Clear the error flag set by std::cin.fail()
+    std::cin.clear();
+    // Ignore the rest of the input if invalid
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
     if (!glfwInit())
         return -1;
 
-    window = glfwCreateWindow(window_width, window_height, "Abegail Laureen R. Magaling", NULL, NULL);
+    window = glfwCreateWindow(window_width, window_height, "Abegail Laureen R. Magaling | Vincent Ralph N. Chang", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -86,16 +100,11 @@ int main(void)
     glCompileShader(fragmentShader);
     GLuint shaderProg = glCreateProgram();
 
-
     glAttachShader(shaderProg, vertexShader);
     glAttachShader(shaderProg, fragmentShader);
     glLinkProgram(shaderProg);
 
-    glViewport(0, // Min x
-        0,//Min y
-        800,//Width
-        800); // Height
-    
+    glViewport(0, 0, 800, 800);
 
     std::string path = "3D/sphere.obj";
     std::vector<tinyobj::shape_t> shapes;
@@ -118,14 +127,12 @@ int main(void)
         0.f, 0.5f, 0.f, //0
         -0.5f, -0.5f, 0.f, //1
         0.5f, -0.5f, 0.f //2
-
     };
 
     GLuint indices[]
     {
         0,1,2
     };
-
 
     GLuint VAO, VBO, EBO;
 
@@ -150,7 +157,7 @@ int main(void)
     glBindVertexArray(0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    glm::mat4 identity_martix = glm::mat4(1.0f);
+    glm::mat4 identity_matrix = glm::mat4(1.0f);
 
     glm::mat4 projectionMatrix = glm::ortho(
         -400.f, //L
@@ -160,19 +167,23 @@ int main(void)
         -1.f,//Znear
         100.f);//Zfar
 
-    physics::MyVector position(0, -300, 0);
     physics::MyVector scale(50, 50, 50);
-    
-
     physics::PhysicsParticle particle = physics::PhysicsParticle();
-    particle.Position = physics::MyVector(0, -300, 0);
-    particle.Velocity = physics::MyVector(X_Vel, Y_Vel, Z_Vel);
+    particle.Position = physics::MyVector(0, -350, 0);
     particle.Acceleration = physics::MyVector(0, -50, 0);
-    
+
+    if (allDefined) {
+        particle.Velocity = physics::MyVector(X_Vel, Y_Vel, Z_Vel);
+    }
+    else {
+        particle.Velocity = physics::MyVector(0, 0, 0);
+    }
+
+    auto start_time = clock::now();
+    bool timer_stopped = false;
 
     while (!glfwWindowShouldClose(window))
     {
-
         glClear(GL_COLOR_BUFFER_BIT);
 
         curr_time = clock::now();
@@ -183,15 +194,24 @@ int main(void)
 
         if (curr_ns >= timestep) {
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(curr_ns);
-            std::cout << "MS: " << (float)ms.count() << "\n";
-
             curr_ns -= curr_ns;
-            std::cout << "Physics Update" << std::endl;
-            particle.update((float)ms.count() / 1000);
-        }
-        std::cout << "Normal Update" << std::endl;
+            if (allDefined) {
+                particle.update((float)ms.count() / 1000);
+            }
+            //std::cout << "Position: " << particle.Position.x << ", " << particle.Position.y << ", " << particle.Position.z << std::endl;
+            //std::cout << "Velocity: " << particle.Velocity.x << ", " << particle.Velocity.y << ", " << particle.Velocity.z << std::endl;
 
-        glm::mat4 transformation_matrix = glm::translate(identity_martix, (glm::vec3)particle.Position);
+            // Check if the y position is below -351 and stop the timer
+            if (!timer_stopped && particle.Position.y <= -351.0f) {
+                auto end_time = clock::now();
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+                std::cout << "Time elapsed: " << static_cast<float>(elapsed.count() / 1000.f) << " seconds" << std::endl;
+                timer_stopped = true;
+                break;
+            }
+        }
+
+        glm::mat4 transformation_matrix = glm::translate(identity_matrix, (glm::vec3)particle.Position);
         transformation_matrix = glm::scale(transformation_matrix, (glm::vec3)scale);
         transformation_matrix = glm::rotate(transformation_matrix, glm::radians(theta), glm::normalize(glm::vec3(axis_x, axis_y, axis_z)));
 
@@ -203,7 +223,6 @@ int main(void)
         glUseProgram(shaderProg);
         glBindVertexArray(VAO);
 
-        glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, mesh_indices.size(), GL_UNSIGNED_INT, 0);
 
         glfwSwapBuffers(window);
